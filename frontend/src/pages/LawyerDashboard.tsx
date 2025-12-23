@@ -6,7 +6,6 @@ import api from '../api/axios';
 const LawyerDashboard = () => {
     const { user, logout } = useAuth();
     const navigate = useNavigate();
-    // const [profile, setProfile] = useState<any>(null);
     const [bio, setBio] = useState('');
     const [expertise, setExpertise] = useState('');
 
