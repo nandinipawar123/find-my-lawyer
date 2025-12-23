@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import api from '../api/axios';
@@ -6,7 +6,7 @@ import api from '../api/axios';
 const LawyerDashboard = () => {
     const { user, logout } = useAuth();
     const navigate = useNavigate();
-    const [profile, setProfile] = useState<any>(null);
+    // const [profile, setProfile] = useState<any>(null);
     const [bio, setBio] = useState('');
     const [expertise, setExpertise] = useState('');
 
