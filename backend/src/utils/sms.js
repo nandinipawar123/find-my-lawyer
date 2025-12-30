@@ -11,12 +11,24 @@ if (accountSid && authToken) {
 
 const formatPhoneNumber = (phone) => {
   if (!phone) return phone;
-  // If it doesn't start with +, and it looks like a number, add +
-  // This is a simple heuristic. For better results, use a library like libphonenumber-js
-  if (!phone.startsWith('+')) {
-    return `+${phone}`;
+  
+  // Remove all non-numeric characters except +
+  let cleaned = phone.replace(/[^\d+]/g, '');
+  
+  // If it doesn't start with +, add it
+  if (!cleaned.startsWith('+')) {
+    // If it starts with 91 but no +, add +
+    if (cleaned.startsWith('91') && cleaned.length > 10) {
+      cleaned = '+' + cleaned;
+    } else {
+      // Otherwise assume it's a 10-digit Indian number and add +91
+      // Strip leading 0 if present
+      cleaned = cleaned.replace(/^0/, '');
+      cleaned = '+91' + cleaned;
+    }
   }
-  return phone;
+  
+  return cleaned;
 };
 
 const sendOtp = async (phone) => {
