@@ -1,35 +1,57 @@
-const mongoose = require('mongoose');
-const bcrypt = require('bcryptjs');
-const User = require('../models/User');
 require('dotenv').config();
+const supabase = require('../config/supabase');
 
 const createAdmin = async () => {
     try {
-        await mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/findmylawyer');
+        const adminEmail = 'admin@findmylawyer.com';
+        const adminPassword = 'admin123';
 
-        // Check if admin exists
-        const adminExists = await User.findOne({ email: 'admin@findmylawyer.com' });
+        const { data: existingUser } = await supabase.auth.admin.listUsers();
+        const adminExists = existingUser.users.find(u => u.email === adminEmail);
+
         if (adminExists) {
-            console.log('Admin already exists');
-            process.exit();
+            console.log('Admin user already exists:', adminEmail);
+            process.exit(0);
         }
 
-        const salt = await bcrypt.genSalt(10);
-        const hashedPassword = await bcrypt.hash('admin123', salt); // Default password
-
-        const admin = await User.create({
-            name: 'Super Admin',
-            email: 'admin@findmylawyer.com',
-            password: hashedPassword,
-            phone: '0000000000',
-            role: 'admin',
-            isPhoneVerified: true,
+        const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+            email: adminEmail,
+            password: adminPassword,
+            email_confirm: true,
+            user_metadata: {
+                name: 'Super Admin',
+                phone: '0000000000',
+                role: 'admin'
+            }
         });
 
-        console.log('Admin user created:', admin.email);
-        process.exit();
+        if (authError) {
+            throw authError;
+        }
+
+        const { error: profileError } = await supabase
+            .from('profiles')
+            .insert({
+                id: authData.user.id,
+                full_name: 'Super Admin',
+                phone: '0000000000',
+                role: 'admin',
+                is_phone_verified: true
+            });
+
+        if (profileError) {
+            await supabase.auth.admin.deleteUser(authData.user.id);
+            throw profileError;
+        }
+
+        console.log('Admin user created successfully!');
+        console.log('Email:', adminEmail);
+        console.log('Password:', adminPassword);
+        console.log('Please change the password after first login.');
+
+        process.exit(0);
     } catch (error) {
-        console.error(error);
+        console.error('Error creating admin user:', error.message);
         process.exit(1);
     }
 };

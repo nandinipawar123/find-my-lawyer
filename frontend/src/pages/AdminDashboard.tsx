@@ -61,12 +61,16 @@ const AdminDashboard = () => {
                                 </tr>
                             ) : (
                                 pendingLawyers.map((profile) => (
-                                    <tr key={profile._id} className="border-b hover:bg-gray-50">
-                                        <td className="p-4">{profile.user?.name}</td>
+                                    <tr key={profile.id} className="border-b hover:bg-gray-50">
+                                        <td className="p-4">{profile.user?.full_name}</td>
                                         <td className="p-4">{profile.user?.email}</td>
-                                        <td className="p-4">{profile.enrollmentNumber}</td>
+                                        <td className="p-4">{profile.enrollment_number}</td>
                                         <td className="p-4">
-                                            <a href={profile.certificateUrl} target="_blank" rel="noreferrer" className="text-blue-600 underline">View</a>
+                                            {profile.certificate_url ? (
+                                                <a href={profile.certificate_url} target="_blank" rel="noreferrer" className="text-blue-600 underline">View</a>
+                                            ) : (
+                                                <span className="text-gray-400">Not uploaded</span>
+                                            )}
                                         </td>
                                         <td className="p-4">
                                             <input
@@ -78,13 +82,13 @@ const AdminDashboard = () => {
                                         </td>
                                         <td className="p-4 flex gap-2">
                                             <button
-                                                onClick={() => handleVerify(profile._id, 'VERIFIED')}
+                                                onClick={() => handleVerify(profile.id, 'VERIFIED')}
                                                 className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700"
                                             >
                                                 Approve
                                             </button>
                                             <button
-                                                onClick={() => handleVerify(profile._id, 'REJECTED')}
+                                                onClick={() => handleVerify(profile.id, 'REJECTED')}
                                                 className="bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700"
                                             >
                                                 Reject

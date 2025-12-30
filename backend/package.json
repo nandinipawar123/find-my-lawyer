@@ -14,7 +14,7 @@
     ],
     "license": "UNLICENSED",
     "dependencies": {
-        "bcryptjs": "^3.0.3",
+        "@supabase/supabase-js": "^2.89.0",
         "cookie-parser": "^1.4.7",
         "cors": "^2.8.5",
         "dotenv": "^17.2.3",
@@ -27,7 +27,6 @@
         "jsonwebtoken": "^9.0.3",
         "mandatoryenv": "^1.1.1",
         "module-alias": "^2.2.2",
-        "mongoose": "^9.0.2",
         "morgan": "^1.9.1",
         "multer": "^2.0.2",
         "rotating-file-stream": "^1.4.6",

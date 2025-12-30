@@ -1,30 +1,55 @@
-# backend
+# FindMyLawyer Backend
+
+Backend API for FindMyLawyer application using Express.js and Supabase.
 
 ## Setup
 
-1. Go to project folder
+1. Navigate to backend folder
 
-> cd backend
+```bash
+cd backend
+```
 
 2. Install Dependencies
 
-> npm run setup
+```bash
+npm install
+```
 
-3. Create .env with following content
+3. Configure Environment Variables
 
-````
-DB_URL=
+The `.env` file is already created. You need to add your Supabase Service Role Key:
 
-PORT=3000
-SECRET=AAA
-````
+```env
+PORT=5000
+JWT_SECRET=supersecretkey_dev_only_change_in_production
+
+SUPABASE_URL=https://cbunsjdyjmjdcntwnauo.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key_here
+```
+
+Get your Supabase Service Role Key from the Supabase Dashboard.
 
 ## Run
 
-1. Start Server
+Start the server:
 
-> npm start
+```bash
+npm start
+```
 
-2. Open in url or using an Endpoint tester (postman)
+The API will be available at `http://localhost:5000`
 
-> http://127.0.0.1:3000/
+## API Endpoints
+
+### Authentication
+- `POST /api/auth/register` - Register new user (client/lawyer)
+- `POST /api/auth/login` - Login user
+- `POST /api/auth/verify-otp` - Verify OTP (mock: use "123456")
+- `GET /api/auth/me` - Get current user (protected)
+
+### Lawyer Management
+- `POST /api/lawyers/upload-certificate` - Upload certificate (lawyer, protected)
+- `PUT /api/lawyers/profile` - Update lawyer profile (lawyer, protected)
+- `GET /api/lawyers/pending` - Get pending lawyers (admin, protected)
+- `PUT /api/lawyers/verify/:id` - Verify/reject lawyer (admin, protected)

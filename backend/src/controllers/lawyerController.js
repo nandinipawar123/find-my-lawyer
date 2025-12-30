@@ -1,27 +1,23 @@
-const LawyerProfile = require('../models/LawyerProfile');
-const User = require('../models/User');
+const supabase = require('../config/supabase');
 
 // @desc    Upload Lawyer Certificate
 // @route   POST /api/lawyers/upload-certificate
 // @access  Private (Lawyer)
 const uploadCertificate = async (req, res) => {
-    // Mock File Upload (Multer middleware usually handles this)
-    // Assuming req.file.path or similar would exist if cloudinary/multer was set up
-    // For MVP, we'll accept a 'fake' URL in body or assume a file path from a mock middleware
-
     try {
-        const userId = req.user._id;
-        // In a real scenario, use Cloudinary url
+        const userId = req.user.id;
         const certificateUrl = req.body.certificateUrl || 'https://via.placeholder.com/certificate.pdf';
 
-        const profile = await LawyerProfile.findOne({ user: userId });
+        const { data: profile, error } = await supabase
+            .from('lawyer_profiles')
+            .update({ certificate_url: certificateUrl })
+            .eq('user_id', userId)
+            .select()
+            .maybeSingle();
 
-        if (!profile) {
+        if (error || !profile) {
             return res.status(404).json({ message: 'Lawyer profile not found' });
         }
-
-        profile.certificateUrl = certificateUrl;
-        await profile.save();
 
         res.json({ message: 'Certificate uploaded successfully', certificateUrl });
     } catch (error) {
@@ -35,8 +31,31 @@ const uploadCertificate = async (req, res) => {
 // @access  Private (Admin)
 const getPendingLawyers = async (req, res) => {
     try {
-        const profiles = await LawyerProfile.find({ status: 'PENDING_VERIFICATION' }).populate('user', 'name email phone');
-        res.json(profiles);
+        const { data: profiles, error } = await supabase
+            .from('lawyer_profiles')
+            .select(`
+                *,
+                user:profiles!user_id (
+                    full_name,
+                    phone
+                )
+            `)
+            .eq('status', 'PENDING_VERIFICATION');
+
+        if (error) {
+            return res.status(500).json({ message: error.message });
+        }
+
+        const { data: authUsers } = await supabase.auth.admin.listUsers();
+        const enrichedProfiles = profiles.map(profile => ({
+            ...profile,
+            user: {
+                ...profile.user,
+                email: authUsers.users.find(u => u.id === profile.user_id)?.email
+            }
+        }));
+
+        res.json(enrichedProfiles);
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Server Error' });
@@ -47,20 +66,24 @@ const getPendingLawyers = async (req, res) => {
 // @route   PUT /api/lawyers/verify/:id
 // @access  Private (Admin)
 const verifyLawyer = async (req, res) => {
-    const { status, authorizedRate } = req.body; // status: 'VERIFIED' or 'REJECTED'
+    const { status, authorizedRate } = req.body;
     const profileId = req.params.id;
 
     try {
-        const profile = await LawyerProfile.findById(profileId);
+        const updates = {};
+        if (status) updates.status = status;
+        if (authorizedRate !== undefined) updates.authorized_rate = authorizedRate;
 
-        if (!profile) {
+        const { data: profile, error } = await supabase
+            .from('lawyer_profiles')
+            .update(updates)
+            .eq('id', profileId)
+            .select()
+            .maybeSingle();
+
+        if (error || !profile) {
             return res.status(404).json({ message: 'Profile not found' });
         }
-
-        if (status) profile.status = status;
-        if (authorizedRate) profile.authorizedRate = authorizedRate;
-
-        await profile.save();
 
         res.json({ message: `Lawyer ${status.toLowerCase()} successfully`, profile });
     } catch (error) {
@@ -76,22 +99,36 @@ const updateProfile = async (req, res) => {
     const { bio, expertise } = req.body;
 
     try {
-        const profile = await LawyerProfile.findOne({ user: req.user._id });
+        const { data: profile, error: fetchError } = await supabase
+            .from('lawyer_profiles')
+            .select('*')
+            .eq('user_id', req.user.id)
+            .maybeSingle();
 
-        if (!profile) {
+        if (fetchError || !profile) {
             return res.status(404).json({ message: 'Profile not found' });
         }
 
-        // Only allow if verified
         if (profile.status !== 'VERIFIED') {
             return res.status(403).json({ message: 'Account not verified yet' });
         }
 
-        if (bio) profile.bio = bio;
-        if (expertise) profile.expertise = expertise; // Array of strings
+        const updates = {};
+        if (bio) updates.bio = bio;
+        if (expertise) updates.expertise = expertise;
 
-        await profile.save();
-        res.json(profile);
+        const { data: updatedProfile, error: updateError } = await supabase
+            .from('lawyer_profiles')
+            .update(updates)
+            .eq('user_id', req.user.id)
+            .select()
+            .single();
+
+        if (updateError) {
+            return res.status(500).json({ message: updateError.message });
+        }
+
+        res.json(updatedProfile);
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Server Error' });
