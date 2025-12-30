@@ -1,4 +1,5 @@
-const supabase = require('../config/supabase');
+const { eq } = require('drizzle-orm');
+const { db, profiles, lawyerProfiles } = require('../db');
 
 // @desc    Upload Lawyer Certificate
 // @route   POST /api/lawyers/upload-certificate
@@ -8,14 +9,12 @@ const uploadCertificate = async (req, res) => {
         const userId = req.user.id;
         const certificateUrl = req.body.certificateUrl || 'https://via.placeholder.com/certificate.pdf';
 
-        const { data: profile, error } = await supabase
-            .from('lawyer_profiles')
-            .update({ certificate_url: certificateUrl })
-            .eq('user_id', userId)
-            .select()
-            .maybeSingle();
+        const [profile] = await db.update(lawyerProfiles)
+            .set({ certificateUrl, updatedAt: new Date() })
+            .where(eq(lawyerProfiles.userId, userId))
+            .returning();
 
-        if (error || !profile) {
+        if (!profile) {
             return res.status(404).json({ message: 'Lawyer profile not found' });
         }
 
@@ -31,27 +30,30 @@ const uploadCertificate = async (req, res) => {
 // @access  Private (Admin)
 const getPendingLawyers = async (req, res) => {
     try {
-        const { data: profiles, error } = await supabase
-            .from('lawyer_profiles')
-            .select(`
-                *,
-                user:profiles!user_id (
-                    full_name,
-                    phone
-                )
-            `)
-            .eq('status', 'PENDING_VERIFICATION');
+        const pendingLawyers = await db.select({
+            id: lawyerProfiles.id,
+            userId: lawyerProfiles.userId,
+            enrollmentNumber: lawyerProfiles.enrollmentNumber,
+            certificateUrl: lawyerProfiles.certificateUrl,
+            status: lawyerProfiles.status,
+            authorizedRate: lawyerProfiles.authorizedRate,
+            bio: lawyerProfiles.bio,
+            expertise: lawyerProfiles.expertise,
+            createdAt: lawyerProfiles.createdAt,
+            fullName: profiles.fullName,
+            phone: profiles.phone,
+            email: profiles.email,
+        })
+        .from(lawyerProfiles)
+        .leftJoin(profiles, eq(lawyerProfiles.userId, profiles.id))
+        .where(eq(lawyerProfiles.status, 'PENDING_VERIFICATION'));
 
-        if (error) {
-            return res.status(500).json({ message: error.message });
-        }
-
-        const { data: authUsers } = await supabase.auth.admin.listUsers();
-        const enrichedProfiles = profiles.map(profile => ({
-            ...profile,
+        const enrichedProfiles = pendingLawyers.map(lawyer => ({
+            ...lawyer,
             user: {
-                ...profile.user,
-                email: authUsers.users.find(u => u.id === profile.user_id)?.email
+                full_name: lawyer.fullName,
+                phone: lawyer.phone,
+                email: lawyer.email
             }
         }));
 
@@ -70,18 +72,16 @@ const verifyLawyer = async (req, res) => {
     const profileId = req.params.id;
 
     try {
-        const updates = {};
+        const updates = { updatedAt: new Date() };
         if (status) updates.status = status;
-        if (authorizedRate !== undefined) updates.authorized_rate = authorizedRate;
+        if (authorizedRate !== undefined) updates.authorizedRate = authorizedRate;
 
-        const { data: profile, error } = await supabase
-            .from('lawyer_profiles')
-            .update(updates)
-            .eq('id', profileId)
-            .select()
-            .maybeSingle();
+        const [profile] = await db.update(lawyerProfiles)
+            .set(updates)
+            .where(eq(lawyerProfiles.id, profileId))
+            .returning();
 
-        if (error || !profile) {
+        if (!profile) {
             return res.status(404).json({ message: 'Profile not found' });
         }
 
@@ -99,13 +99,12 @@ const updateProfile = async (req, res) => {
     const { bio, expertise } = req.body;
 
     try {
-        const { data: profile, error: fetchError } = await supabase
-            .from('lawyer_profiles')
-            .select('*')
-            .eq('user_id', req.user.id)
-            .maybeSingle();
+        const [profile] = await db.select()
+            .from(lawyerProfiles)
+            .where(eq(lawyerProfiles.userId, req.user.id))
+            .limit(1);
 
-        if (fetchError || !profile) {
+        if (!profile) {
             return res.status(404).json({ message: 'Profile not found' });
         }
 
@@ -113,20 +112,14 @@ const updateProfile = async (req, res) => {
             return res.status(403).json({ message: 'Account not verified yet' });
         }
 
-        const updates = {};
+        const updates = { updatedAt: new Date() };
         if (bio) updates.bio = bio;
         if (expertise) updates.expertise = expertise;
 
-        const { data: updatedProfile, error: updateError } = await supabase
-            .from('lawyer_profiles')
-            .update(updates)
-            .eq('user_id', req.user.id)
-            .select()
-            .single();
-
-        if (updateError) {
-            return res.status(500).json({ message: updateError.message });
-        }
+        const [updatedProfile] = await db.update(lawyerProfiles)
+            .set(updates)
+            .where(eq(lawyerProfiles.userId, req.user.id))
+            .returning();
 
         res.json(updatedProfile);
     } catch (error) {

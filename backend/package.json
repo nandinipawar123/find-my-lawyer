@@ -5,7 +5,8 @@
     "main": "src/server.js",
     "scripts": {
         "setup": "npm install && npm update",
-        "start": "node src/server.js"
+        "start": "node src/server.js",
+        "db:push": "drizzle-kit push --config=drizzle.config.js"
     },
     "keywords": [
         "express",
@@ -14,11 +15,12 @@
     ],
     "license": "UNLICENSED",
     "dependencies": {
-        "@supabase/supabase-js": "^2.89.0",
+        "bcryptjs": "^2.4.3",
         "cloudinary": "^2.8.0",
         "cookie-parser": "^1.4.7",
         "cors": "^2.8.5",
         "dotenv": "^17.2.3",
+        "drizzle-orm": "^0.30.0",
         "express": "^4.17.1",
         "express-custom-error": "^1.8.4",
         "express-validator": "^7.3.1",
@@ -30,8 +32,12 @@
         "module-alias": "^2.2.2",
         "morgan": "^1.9.1",
         "multer": "^2.0.2",
+        "pg": "^8.11.0",
         "rotating-file-stream": "^1.4.6",
         "twilio": "^5.11.1"
+    },
+    "devDependencies": {
+        "drizzle-kit": "^0.21.0"
     },
     "_moduleAliases": {
         "@root": "src",
