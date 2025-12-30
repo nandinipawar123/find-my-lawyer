@@ -1,31 +1,36 @@
 # FindMyLawyer - Project Setup
 
 ## Overview
-A full-stack application for connecting clients with verified lawyers. Built with React + Vite (frontend) and Express.js (backend) with Supabase as the database.
+A full-stack application for connecting clients with verified lawyers. Built with React + Vite (frontend) and Express.js (backend) with PostgreSQL database using Drizzle ORM.
 
 ## Project Structure
 ```
 ├── frontend/          # React + Vite + TypeScript
-├── backend/           # Express.js + Node.js
-├── supabase/          # Database migrations
+├── backend/           # Express.js + Node.js + Drizzle ORM
+│   ├── src/
+│   │   ├── controllers/   # Route handlers
+│   │   ├── db/            # Database schema and connection
+│   │   ├── middleware/    # Auth middleware
+│   │   ├── routes/        # API routes
+│   │   └── utils/         # Utility functions
+│   └── drizzle.config.js  # Drizzle configuration
 └── README.md
 ```
 
 ## Technology Stack
 - **Frontend**: React 19, Vite 7, TypeScript, TailwindCSS
-- **Backend**: Express.js, Node.js 20
-- **Database**: Supabase (PostgreSQL)
-- **Auth**: Supabase Auth with JWT tokens
+- **Backend**: Express.js, Node.js 20, Drizzle ORM
+- **Database**: PostgreSQL (Neon)
+- **Auth**: JWT tokens with bcrypt password hashing
 - **File Upload**: Cloudinary (optional)
 - **SMS**: Twilio (optional)
 
 ## Development Setup
 
 ### Environment Variables
-The following secrets are configured in Replit:
-- `SUPABASE_URL` - Supabase project URL
-- `SUPABASE_SERVICE_ROLE_KEY` - Service role key for backend operations
-- `JWT_SECRET` - Secret for JWT token generation
+The following are configured automatically via Replit:
+- `DATABASE_URL` - PostgreSQL connection string (auto-provisioned)
+- `JWT_SECRET` - Secret for JWT token generation (defaults to dev key)
 
 ### Running the Application
 Two workflows are configured:
@@ -33,18 +38,15 @@ Two workflows are configured:
 2. **Backend** - `npm start` on port 3000
 
 ### Database Schema
-The Supabase database requires the following tables:
-- `profiles` - User profiles with role (client/lawyer/admin)
-- `lawyer_profiles` - Extended lawyer information
+The PostgreSQL database includes the following tables:
+- `profiles` - User profiles with role (client/lawyer/admin), email, password hash
+- `lawyer_profiles` - Extended lawyer information (enrollment, certificate, status)
 - `categories` - Practice categories
 
-**IMPORTANT**: The database migration must be applied manually:
-1. Go to your Supabase dashboard
-2. Navigate to SQL Editor
-3. Create a new query and copy the contents from `supabase/migrations/20251230075355_create_initial_schema.sql`
-4. Execute the query
-
-This will create all necessary tables, indexes, and Row Level Security policies.
+To push schema changes:
+```bash
+cd backend && npm run db:push
+```
 
 ## API Endpoints
 
@@ -69,17 +71,19 @@ The frontend API client is configured in `frontend/src/api/axios.ts`:
 Deployment configuration is set up using Replit's autoscale deployment:
 - **Build**: `npm run build`
 - **Run**: Backend on port 3000 + Frontend preview on port 5000
-- **Public Dir**: `frontend/dist`
+
+## Migration Notes (Dec 30, 2025)
+- Migrated from Supabase to local PostgreSQL with Drizzle ORM
+- Authentication now uses bcrypt for password hashing and local JWT generation
+- All database operations use Drizzle ORM instead of Supabase client
+- Database schema is managed via Drizzle Kit (`npm run db:push`)
 
 ## Next Steps
-1. Apply the Supabase database migration (see above)
-2. Test user registration through the frontend
-3. Configure optional services (Cloudinary for file uploads, Twilio for SMS)
-4. Customize JWT_SECRET for production
-5. Deploy to production via Replit's publish feature
+1. Test user registration through the frontend
+2. Configure optional services (Cloudinary for file uploads, Twilio for SMS)
+3. Customize JWT_SECRET for production
+4. Deploy to production via Replit's publish feature
 
-## Registration Fixed
-- Supabase credentials are now properly configured
-- Backend can create users and profiles
-- Test OTP for verification: 123456
+## Testing
+- Test OTP for phone verification: 123456
 - Users can register as clients or lawyers

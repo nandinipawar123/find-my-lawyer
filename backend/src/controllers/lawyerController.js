@@ -85,7 +85,10 @@ const verifyLawyer = async (req, res) => {
             return res.status(404).json({ message: 'Profile not found' });
         }
 
-        res.json({ message: `Lawyer ${status.toLowerCase()} successfully`, profile });
+        const message = status 
+            ? `Lawyer ${status.toLowerCase()} successfully` 
+            : 'Lawyer profile updated successfully';
+        res.json({ message, profile });
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Server Error' });
