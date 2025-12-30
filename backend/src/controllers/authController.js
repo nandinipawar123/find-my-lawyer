@@ -3,6 +3,8 @@ const { eq } = require('drizzle-orm');
 const { db, profiles, lawyerProfiles } = require('../db');
 const generateToken = require('../utils/generateToken');
 
+const { sendOtp, verifyOtpCode } = require('../utils/sms');
+
 // @desc    Register a new user (Client or Lawyer)
 // @route   POST /api/auth/register
 // @access  Public
@@ -43,7 +45,7 @@ const registerUser = async (req, res) => {
       });
     }
 
-    console.log(`[MOCK OTP] Sending OTP to ${phone} for User ID ${newProfile.id}`);
+    await sendOtp(phone);
 
     res.status(201).json({
       _id: newProfile.id,
@@ -66,15 +68,18 @@ const verifyOtp = async (req, res) => {
   const { userId, otp } = req.body;
 
   try {
-    if (otp === '123456') {
+    const [profile] = await db.select().from(profiles).where(eq(profiles.id, userId)).limit(1);
+    if (!profile) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const isVerified = await verifyOtpCode(profile.phone, otp);
+
+    if (isVerified) {
       const [updatedProfile] = await db.update(profiles)
         .set({ isPhoneVerified: true, updatedAt: new Date() })
         .where(eq(profiles.id, userId))
         .returning();
-
-      if (!updatedProfile) {
-        return res.status(404).json({ message: 'User not found' });
-      }
 
       res.json({
         _id: updatedProfile.id,
