@@ -1,15 +1,16 @@
 import axios from 'axios';
 
-// Use window.location to dynamically construct the backend URL
+// Use Replit domain for development
 const getApiUrl = () => {
-    const host = window.location.host;
-    // In development (Replit), use the same domain with port 3000
-    // In production, use the same domain without port
-    return `http://${host.split(':')[0]}:3000/api`;
+    // In Replit environment, we can use the dev domain with the correct protocol
+    // The backend runs on port 3000, but Replit's proxy handles the routing
+    // However, if we're calling a separate port, we might need the full URL
+    const domain = window.location.hostname.replace('5000', '3000');
+    return `https://${domain}/api`;
 };
 
 const api = axios.create({
-    baseURL: import.meta.env.VITE_API_URL || getApiUrl(),
+    baseURL: '/api', // Use relative path and proxy in vite for easier dev
     headers: {
         'Content-Type': 'application/json',
     },

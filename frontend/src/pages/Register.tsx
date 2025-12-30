@@ -35,9 +35,14 @@ const Register = () => {
             };
 
             const res = await api.post('/auth/register', payload);
-            setUserId(res.data._id);
-            setStep(2);
-            setError('');
+            // Check if the response has data and id
+            if (res.data && (res.data._id || res.data.id)) {
+                setUserId(res.data._id || res.data.id);
+                setStep(2);
+                setError('');
+            } else {
+                throw new Error('Invalid response from server');
+            }
         } catch (err: any) {
             setError(err.response?.data?.message || 'Registration failed');
         }
