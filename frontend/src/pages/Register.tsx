@@ -23,7 +23,18 @@ const Register = () => {
     const isLawyer = type === 'lawyer';
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        setFormData({ ...formData, [e.target.name]: e.target.value });
+        let value = e.target.value;
+        if (e.target.name === 'phone') {
+            // Remove any existing +91 if user manually typed it to avoid duplicates
+            // then add it at the start
+            const numericValue = value.replace(/[^\d]/g, '');
+            if (numericValue.startsWith('91')) {
+                value = '+' + numericValue;
+            } else if (numericValue.length > 0) {
+                value = '+91' + numericValue;
+            }
+        }
+        setFormData({ ...formData, [e.target.name]: value });
     };
 
     const handleRegister = async (e: React.FormEvent) => {
@@ -87,8 +98,9 @@ const Register = () => {
                             onChange={handleChange} required
                         />
                         <input
-                            type="text" placeholder="Phone Number" name="phone"
+                            type="text" placeholder="Phone Number (e.g. 9876543210)" name="phone"
                             className="w-full p-2 border rounded"
+                            value={formData.phone}
                             onChange={handleChange} required
                         />
                         <input
