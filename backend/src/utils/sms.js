@@ -9,16 +9,27 @@ if (accountSid && authToken) {
   client = twilio(accountSid, authToken);
 }
 
+const formatPhoneNumber = (phone) => {
+  if (!phone) return phone;
+  // If it doesn't start with +, and it looks like a number, add +
+  // This is a simple heuristic. For better results, use a library like libphonenumber-js
+  if (!phone.startsWith('+')) {
+    return `+${phone}`;
+  }
+  return phone;
+};
+
 const sendOtp = async (phone) => {
+  const formattedPhone = formatPhoneNumber(phone);
   if (!client || !verifyServiceSid) {
-    console.log(`[MOCK OTP] Sending OTP to ${phone} (Twilio not configured)`);
+    console.log(`[MOCK OTP] Sending OTP to ${formattedPhone} (Twilio not configured)`);
     return { status: 'mocked' };
   }
 
   try {
     const verification = await client.verify.v2.services(verifyServiceSid)
       .verifications
-      .create({ to: phone, channel: 'sms' });
+      .create({ to: formattedPhone, channel: 'sms' });
     return verification;
   } catch (error) {
     console.error('Twilio Error:', error);
@@ -27,15 +38,16 @@ const sendOtp = async (phone) => {
 };
 
 const verifyOtpCode = async (phone, code) => {
+  const formattedPhone = formatPhoneNumber(phone);
   if (!client || !verifyServiceSid) {
-    console.log(`[MOCK OTP] Verifying OTP ${code} for ${phone} (Twilio not configured)`);
+    console.log(`[MOCK OTP] Verifying OTP ${code} for ${formattedPhone} (Twilio not configured)`);
     return code === '123456';
   }
 
   try {
     const verificationCheck = await client.verify.v2.services(verifyServiceSid)
       .verificationChecks
-      .create({ to: phone, code });
+      .create({ to: formattedPhone, code });
     return verificationCheck.status === 'approved';
   } catch (error) {
     console.error('Twilio Error:', error);
