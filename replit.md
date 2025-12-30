@@ -77,3 +77,9 @@ Deployment configuration is set up using Replit's autoscale deployment:
 3. Configure optional services (Cloudinary for file uploads, Twilio for SMS)
 4. Customize JWT_SECRET for production
 5. Deploy to production via Replit's publish feature
+
+## Registration Fixed
+- Supabase credentials are now properly configured
+- Backend can create users and profiles
+- Test OTP for verification: 123456
+- Users can register as clients or lawyers
