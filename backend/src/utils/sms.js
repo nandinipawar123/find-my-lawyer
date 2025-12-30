@@ -22,8 +22,7 @@ const formatPhoneNumber = (phone) => {
 const sendOtp = async (phone) => {
   const formattedPhone = formatPhoneNumber(phone);
   if (!client || !verifyServiceSid) {
-    console.log(`[MOCK OTP] Sending OTP to ${formattedPhone} (Twilio not configured)`);
-    return { status: 'mocked' };
+    throw new Error('Twilio not configured');
   }
 
   try {
@@ -33,24 +32,15 @@ const sendOtp = async (phone) => {
     return verification;
   } catch (error) {
     console.error('Twilio Error:', error.message);
-    if (error.code === 21608 || error.status === 403) {
-      console.log(`[FALLBACK OTP] Twilio Trial limitation. Use Mock OTP 123456 for ${formattedPhone}`);
-      return { status: 'mocked' };
-    }
     throw error;
   }
 };
 
 const verifyOtpCode = async (phone, code) => {
   const formattedPhone = formatPhoneNumber(phone);
-  // Always allow mock OTP in dev or if Twilio fails
-  if (code === '123456') {
-      console.log(`[VERIFY] Using Mock OTP for ${formattedPhone}`);
-      return true;
-  }
 
   if (!client || !verifyServiceSid) {
-    return false;
+    throw new Error('Twilio not configured');
   }
 
   try {
@@ -60,7 +50,7 @@ const verifyOtpCode = async (phone, code) => {
     return verificationCheck.status === 'approved';
   } catch (error) {
     console.error('Twilio Verify Error:', error.message);
-    return false;
+    throw error;
   }
 };
 
