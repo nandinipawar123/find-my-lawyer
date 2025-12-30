@@ -10,7 +10,7 @@ const getApiUrl = () => {
 };
 
 const api = axios.create({
-    baseURL: '/api', // Use relative path and proxy in vite for easier dev
+    baseURL: '/api',
     headers: {
         'Content-Type': 'application/json',
     },
