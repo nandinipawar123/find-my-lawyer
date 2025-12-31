@@ -2,6 +2,8 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 
+const fileUpload = require('express-fileupload');
+
 const app = express();
 
 // Middleware
@@ -10,6 +12,7 @@ app.use(cors({
     origin: '*', // Allow all origins in dev
     credentials: true
 }));
+app.use(fileUpload());
 
 // Basic Route
 app.get('/', (req, res) => {

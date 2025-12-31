@@ -15,6 +15,9 @@
     "bcryptjs": "^3.0.3",
     "drizzle-kit": "^0.31.8",
     "drizzle-orm": "^0.45.1",
-    "pg": "^8.16.3"
+    "express-fileupload": "^1.5.2",
+    "lucide-react": "^0.562.0",
+    "pg": "^8.16.3",
+    "react-dropzone": "^14.3.8"
   }
 }

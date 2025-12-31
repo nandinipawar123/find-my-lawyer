@@ -1,34 +1,61 @@
 const supabase = require('../config/supabase');
+const path = require('path');
 
 // @desc    Upload Lawyer Certificate
 // @route   POST /api/lawyers/upload-certificate
 // @access  Private (Lawyer)
 const uploadCertificate = async (req, res) => {
     try {
-        const userId = req.user.id;
-        const certificateUrl = req.body.certificateUrl || 'https://via.placeholder.com/certificate.pdf';
-
-        const { data: profile, error } = await supabase
-            .from('lawyer_profiles')
-            .update({ certificate_url: certificateUrl })
-            .eq('user_id', userId)
-            .select()
-            .maybeSingle();
-
-        if (error || !profile) {
-            return res.status(404).json({ message: 'Lawyer profile not found' });
+        if (!req.files || !req.files.file) {
+            return res.status(400).json({ message: 'No file uploaded' });
         }
 
-        res.json({ message: 'Certificate uploaded successfully', certificateUrl });
+        const userId = req.user.id;
+        const file = req.files.file;
+        const fileExt = path.extname(file.name);
+        const fileName = `${userId}_${Date.now()}${fileExt}`;
+        const filePath = `certificates/${fileName}`;
+
+        // 1. Upload to Supabase Storage
+        const { data, error: uploadError } = await supabase.storage
+            .from('lawyer-assets')
+            .upload(filePath, file.data, {
+                contentType: file.mimetype,
+                upsert: true
+            });
+
+        if (uploadError) {
+            console.error('Supabase Storage Error:', uploadError);
+            return res.status(500).json({ message: 'Error uploading to storage' });
+        }
+
+        // 2. Get Public URL
+        const { data: { publicUrl } } = supabase.storage
+            .from('lawyer-assets')
+            .getPublicUrl(filePath);
+
+        // 3. Update Lawyer Profile
+        const { error: dbError } = await supabase
+            .from('lawyer_profiles')
+            .update({ 
+                certificate_url: publicUrl,
+                status: 'PENDING_VERIFICATION' 
+            })
+            .eq('user_id', userId);
+
+        if (dbError) {
+            console.error('DB Update Error:', dbError);
+            return res.status(500).json({ message: 'Error updating profile' });
+        }
+
+        res.json({ message: 'Certificate uploaded successfully', certificateUrl: publicUrl });
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Server Error' });
+        console.error('Upload catch error:', error);
+        res.status(500).json({ message: 'Server Error during upload' });
     }
 };
 
-// @desc    Get Pending Lawyers (Admin)
-// @route   GET /api/lawyers/pending
-// @access  Private (Admin)
+// ... existing code for getPendingLawyers, verifyLawyer, updateProfile ...
 const getPendingLawyers = async (req, res) => {
     try {
         const { data: profiles, error } = await supabase
@@ -62,9 +89,6 @@ const getPendingLawyers = async (req, res) => {
     }
 };
 
-// @desc    Approve/Reject Lawyer
-// @route   PUT /api/lawyers/verify/:id
-// @access  Private (Admin)
 const verifyLawyer = async (req, res) => {
     const { status, authorizedRate } = req.body;
     const profileId = req.params.id;
@@ -92,9 +116,6 @@ const verifyLawyer = async (req, res) => {
     }
 };
 
-// @desc    Update Lawyer Profile (Bio/Expertise)
-// @route   PUT /api/lawyers/profile
-// @access  Private (Lawyer)
 const updateProfile = async (req, res) => {
     const { bio, expertise } = req.body;
 

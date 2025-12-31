@@ -1,25 +1,23 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import api from '../api/axios';
+import FileUpload from '../components/FileUpload';
 
 const LawyerUpload = () => {
-    const [url, setUrl] = useState('');
     const [msg, setMsg] = useState('');
+    const [isError, setIsError] = useState(false);
     const navigate = useNavigate();
 
-    const handleUpload = async (e: React.FormEvent) => {
-        e.preventDefault();
-        try {
-            // In real app, this would be a file upload. Here we simulate passing a URL.
-            await api.post('/lawyers/upload-certificate', { certificateUrl: url || 'https://mock.com/cert.pdf' });
-            setMsg('Documents uploaded. Your account is pending verification.');
-            setTimeout(() => {
-                navigate('/lawyer/dashboard');
-            }, 2000);
-        } catch (err) {
-            console.error(err);
-            setMsg('Upload failed');
-        }
+    const handleUploadSuccess = (url: string) => {
+        setMsg('Documents uploaded successfully! Your account is pending verification.');
+        setIsError(false);
+        setTimeout(() => {
+            navigate('/lawyer/dashboard');
+        }, 3000);
+    };
+
+    const handleUploadError = (error: string) => {
+        setMsg(error);
+        setIsError(true);
     };
 
     return (
@@ -28,26 +26,16 @@ const LawyerUpload = () => {
                 <h2 className="text-2xl font-bold text-navy mb-4">Upload Credentials</h2>
                 <p className="mb-6 text-gray-600">Please upload your Lawyer Certificate for Admin verification.</p>
 
-                {msg && <div className="bg-green-100 text-green-800 p-2 rounded mb-4">{msg}</div>}
-
-                <form onSubmit={handleUpload} className="space-y-4">
-                    {/* Mocking file input as text URL or just a button */}
-                    <div className="border-2 border-dashed border-gray-300 p-10 rounded">
-                        <p>Drag & Drop your PDF here</p>
-                        <p className="text-sm text-gray-400 mt-2">(or enter a URL for mock)</p>
-                        <input
-                            type="text"
-                            placeholder="Document URL (simulate upload)"
-                            className="w-full border p-2 mt-4"
-                            value={url}
-                            onChange={e => setUrl(e.target.value)}
-                        />
+                {msg && (
+                    <div className={`p-3 rounded mb-6 text-sm ${isError ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+                        {msg}
                     </div>
+                )}
 
-                    <button type="submit" className="w-full py-3 bg-copper text-white font-bold rounded">
-                        Upload Verification Documents
-                    </button>
-                </form>
+                <FileUpload 
+                    onUploadSuccess={handleUploadSuccess}
+                    onUploadError={handleUploadError}
+                />
             </div>
         </div>
     );
