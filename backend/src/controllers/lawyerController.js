@@ -10,8 +10,18 @@ const uploadCertificate = async (req, res) => {
             return res.status(400).json({ message: 'No file uploaded' });
         }
 
-        const userId = req.user.id;
         const file = req.files.file;
+        
+        // Backend Validation: Type and Size
+        if (file.mimetype !== 'application/pdf') {
+            return res.status(400).json({ message: 'Only PDF files are allowed' });
+        }
+
+        if (file.size > 5 * 1024 * 1024) {
+            return res.status(400).json({ message: 'File size exceeds 5MB limit' });
+        }
+
+        const userId = req.user.id;
         const fileExt = path.extname(file.name);
         const fileName = `${userId}_${Date.now()}${fileExt}`;
         const filePath = `certificates/${fileName}`;

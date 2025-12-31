@@ -17,13 +17,13 @@ const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess, onUploadError 
     }
   }, []);
 
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+  const { getRootProps, getInputProps, isDragActive, fileRejections } = useDropzone({
     onDrop,
     accept: {
-      'application/pdf': ['.pdf'],
-      'image/*': ['.jpeg', '.png', '.jpg']
+      'application/pdf': ['.pdf']
     },
-    maxFiles: 1
+    maxFiles: 1,
+    maxSize: 5242880 // 5MB in bytes
   });
 
   const handleUpload = async () => {
@@ -58,24 +58,36 @@ const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess, onUploadError 
     }
   };
 
+  const fileRejectionItems = fileRejections.map(({ file, errors }) => (
+    <div key={file.name} className="mt-2 text-xs text-red-500">
+      {errors.map(e => (
+        <p key={e.code}>{e.code === 'file-invalid-type' ? 'Only PDF files are allowed.' : e.message}</p>
+      ))}
+    </div>
+  ));
+
   return (
     <div className="w-full max-w-md mx-auto">
       <div
         {...getRootProps()}
-        className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors
-          ${isDragActive ? 'border-copper bg-copper/5' : 'border-gray-300 hover:border-copper'}`}
+        className={`border-2 border-dashed rounded-xl p-10 text-center cursor-pointer transition-all duration-200
+          ${isDragActive ? 'border-copper bg-copper/5 scale-[1.02]' : 'border-gray-300 hover:border-copper hover:bg-gray-50'}`}
       >
         <input {...getInputProps()} />
-        <Upload className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+        <div className="bg-copper/10 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+          <Upload className="h-8 w-8 text-copper" />
+        </div>
         {isDragActive ? (
-          <p className="text-copper font-medium">Drop the file here...</p>
+          <p className="text-copper font-semibold">Drop the PDF here...</p>
         ) : (
           <div>
-            <p className="text-gray-600">Drag & drop your certificate here</p>
-            <p className="text-sm text-gray-400 mt-1">PDF, PNG, or JPG (max 5MB)</p>
+            <p className="text-gray-700 font-medium">Click to upload or drag & drop</p>
+            <p className="text-sm text-gray-400 mt-2">Only PDF files (max 5MB)</p>
           </div>
         )}
       </div>
+
+      {fileRejectionItems}
 
       {file && (
         <div className="mt-4 p-4 bg-gray-50 rounded-lg flex items-center justify-between">
