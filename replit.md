@@ -85,5 +85,6 @@ Deployment configuration is set up using Replit's autoscale deployment:
 4. Deploy to production via Replit's publish feature
 
 ## Testing
-- Test OTP for phone verification: 123456
+- Real-time OTP: Enabled via Twilio (requires valid credentials)
+- Test OTP for phone verification: 123456 (always active for testing)
 - Users can register as clients or lawyers

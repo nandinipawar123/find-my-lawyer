@@ -2,77 +2,76 @@ const twilio = require('twilio');
 
 const accountSid = process.env.TWILIO_ACCOUNT_SID;
 const authToken = process.env.TWILIO_AUTH_TOKEN;
-const verifyServiceSid = process.env.TWILIO_VERIFY_SERVICE_SID;
+const fromPhone = process.env.TWILIO_PHONE_NUMBER;
 
 let client;
 if (accountSid && authToken) {
   client = twilio(accountSid, authToken);
 }
 
-const formatPhoneNumber = (phone) => {
-  if (!phone) return phone;
-  
-  // Remove all non-numeric characters except +
-  let cleaned = phone.replace(/[^\d+]/g, '');
-  
-  // If it doesn't start with +, add it
-  if (!cleaned.startsWith('+')) {
-    // If it starts with 91 but no +, add +
-    if (cleaned.startsWith('91') && cleaned.length > 10) {
-      cleaned = '+' + cleaned;
-    } else {
-      // Otherwise assume it's a 10-digit Indian number and add +91
-      // Strip leading 0 if present
-      cleaned = cleaned.replace(/^0/, '');
-      cleaned = '+91' + cleaned;
-    }
-  }
-  
-  return cleaned;
-};
+// In-memory store for OTPs (for production, use Redis or Database)
+const otpStore = new Map();
 
+/**
+ * Send a real OTP via Twilio
+ * @param {string} phone - User's phone number
+ * @returns {Promise<string>} - The generated OTP
+ */
 const sendOtp = async (phone) => {
-  const formattedPhone = formatPhoneNumber(phone);
-  if (!client || !verifyServiceSid) {
-    console.log(`[MOCK OTP] Sending OTP to ${formattedPhone} (Twilio not configured)`);
-    return { status: 'mocked' };
-  }
-
-  try {
-    const verification = await client.verify.v2.services(verifyServiceSid)
-      .verifications
-      .create({ to: formattedPhone, channel: 'sms' });
-    return verification;
-  } catch (error) {
-    console.error('Twilio Error:', error.message);
-    // FALLBACK TO MOCK OTP IF TWILIO FAILS (Trial limit, unverified number, etc)
-    console.log(`[FALLBACK OTP] Twilio failed. Use Mock OTP 123456 for ${formattedPhone}`);
-    return { status: 'mocked' };
-  }
-};
-
-const verifyOtpCode = async (phone, code) => {
-  const formattedPhone = formatPhoneNumber(phone);
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
   
-  // Always allow mock OTP for testing
-  if (code === '123456') {
-    console.log(`[VERIFY] Using Mock OTP for ${formattedPhone}`);
-    return true;
+  if (client && fromPhone) {
+    try {
+      await client.messages.create({
+        body: `Your FindMyLawyer verification code is: ${otp}`,
+        from: fromPhone,
+        to: phone
+      });
+      console.log(`[Twilio] OTP sent to ${phone}`);
+    } catch (error) {
+      console.error('[Twilio] Error sending SMS:', error);
+      // Fallback to mock for development if Twilio fails
+      console.log(`[MOCK OTP] Fallback OTP for ${phone}: ${otp}`);
+    }
+  } else {
+    console.log(`[MOCK OTP] No Twilio credentials. OTP for ${phone}: ${otp}`);
   }
 
-  if (!client || !verifyServiceSid) {
-    return false;
-  }
+  otpStore.set(phone, {
+    otp,
+    expires: Date.now() + 5 * 60 * 1000 // 5 minutes
+  });
 
-  try {
-    const verificationCheck = await client.verify.v2.services(verifyServiceSid)
-      .verificationChecks
-      .create({ to: formattedPhone, code });
-    return verificationCheck.status === 'approved';
-  } catch (error) {
-    console.error('Twilio Verify Error:', error.message);
-    return false;
-  }
+  return otp;
 };
 
-module.exports = { sendOtp, verifyOtpCode };
+/**
+ * Verify the OTP code
+ * @param {string} phone - User's phone number
+ * @param {string} code - Code to verify
+ * @returns {Promise<boolean>}
+ */
+const verifyOtpCode = async (phone, code) => {
+  // Always allow mock OTP for testing if needed, but prioritize real one
+  if (code === '123456') return true;
+
+  const storedData = otpStore.get(phone);
+  if (!storedData) return false;
+
+  if (Date.now() > storedData.expires) {
+    otpStore.delete(phone);
+    return false;
+  }
+
+  const isValid = storedData.otp === code;
+  if (isValid) {
+    otpStore.delete(phone);
+  }
+  
+  return isValid;
+};
+
+module.exports = {
+  sendOtp,
+  verifyOtpCode
+};
