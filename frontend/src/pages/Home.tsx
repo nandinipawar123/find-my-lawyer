@@ -12,13 +12,13 @@ const Home = () => {
                 <div className="flex flex-col md:flex-row gap-6 justify-center">
                     <Link
                         to="/register/client"
-                        className="px-8 py-4 bg-navy text-white text-lg font-semibold rounded-lg hover:bg-opacity-90 transition shadow-lg"
+                        className="px-8 py-4 bg-navy text-white text-lg font-semibold rounded-lg hover:bg-opacity-90 transition shadow-lg text-center"
                     >
                         Register as Client
                     </Link>
                     <Link
                         to="/register/lawyer"
-                        className="px-8 py-4 bg-copper text-white text-lg font-semibold rounded-lg hover:bg-opacity-90 transition shadow-lg"
+                        className="px-8 py-4 bg-copper text-white text-lg font-semibold rounded-lg hover:bg-opacity-90 transition shadow-lg text-center"
                     >
                         Register as Lawyer
                     </Link>

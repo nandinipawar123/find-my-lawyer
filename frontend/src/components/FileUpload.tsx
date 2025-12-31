@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { useDropzone, FileRejection } from 'react-dropzone';
+import { useDropzone } from 'react-dropzone';
 import { Upload, File as FileIcon, X } from 'lucide-react';
 
 interface FileUploadProps {
@@ -58,25 +58,14 @@ const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess, onUploadError 
     }
   };
 
-  const fileRejectionItems = fileRejections.map(({ file, errors }: FileRejection) => (
-    <div key={file.name} className="mt-2 text-xs text-red-500">
-      {errors.map(e => (
-        <p key={e.code}>{e.code === 'file-invalid-type' ? 'Only PDF files are allowed.' : e.message}</p>
-      ))}
-    </div>
-  ));
-
-  const rootProps = getRootProps();
-  const inputProps = getInputProps();
-
   return (
     <div className="w-full max-w-md mx-auto">
       <div
-        {...rootProps}
+        {...getRootProps()}
         className={`border-2 border-dashed rounded-xl p-10 text-center cursor-pointer transition-all duration-200
           ${isDragActive ? 'border-copper bg-copper/5 scale-[1.02]' : 'border-gray-300 hover:border-copper hover:bg-gray-50'}`}
       >
-        <input {...inputProps} />
+        <input {...getInputProps()} />
         <div className="bg-copper/10 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
           <Upload className="h-8 w-8 text-copper" />
         </div>
@@ -90,7 +79,17 @@ const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess, onUploadError 
         )}
       </div>
 
-      {fileRejectionItems}
+      {fileRejections.length > 0 && (
+        <div className="mt-2 text-xs text-red-500">
+          {fileRejections.map(({ file: rejectedFile, errors }) => (
+            <div key={rejectedFile.name}>
+              {errors.map(e => (
+                <p key={e.code}>{e.code === 'file-invalid-type' ? 'Only PDF files are allowed.' : e.message}</p>
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
 
       {file && (
         <div className="mt-4 p-4 bg-gray-50 rounded-lg flex items-center justify-between">
@@ -101,6 +100,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess, onUploadError 
             </span>
           </div>
           <button
+            type="button"
             onClick={(e) => {
               e.stopPropagation();
               setFile(null);
@@ -114,6 +114,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess, onUploadError 
 
       {file && !uploading && (
         <button
+          type="button"
           onClick={(e) => {
             e.stopPropagation();
             handleUpload();
