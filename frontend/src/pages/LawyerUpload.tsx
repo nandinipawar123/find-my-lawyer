@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import FileUpload from '../components/FileUpload';
 
-const LawyerUpload = () => {
+const LawyerUpload: React.FC = () => {
     const [msg, setMsg] = useState('');
     const [isError, setIsError] = useState(false);
     const navigate = useNavigate();
