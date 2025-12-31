@@ -1,6 +1,5 @@
 const jwt = require('jsonwebtoken');
-const { eq } = require('drizzle-orm');
-const { db, profiles } = require('../db');
+const supabase = require('../config/supabase');
 
 const protect = async (req, res, next) => {
     let token;
@@ -14,21 +13,22 @@ const protect = async (req, res, next) => {
 
             const decoded = jwt.verify(token, process.env.JWT_SECRET || 'supersecretkey_dev_only');
 
-            const [profile] = await db.select()
-                .from(profiles)
-                .where(eq(profiles.id, decoded.id))
-                .limit(1);
+            const { data: profile, error } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', decoded.id)
+                .maybeSingle();
 
-            if (!profile) {
+            if (error || !profile) {
                 return res.status(401).json({ message: 'Not authorized, user not found' });
             }
 
             req.user = {
                 id: profile.id,
-                name: profile.fullName,
+                name: profile.full_name,
                 phone: profile.phone,
                 role: profile.role,
-                isPhoneVerified: profile.isPhoneVerified
+                isPhoneVerified: profile.is_phone_verified
             };
 
             next();

@@ -1,9 +1,6 @@
-const bcrypt = require('bcryptjs');
-const { eq } = require('drizzle-orm');
-const { db, profiles, lawyerProfiles } = require('../db');
+const supabase = require('../config/supabase');
 const generateToken = require('../utils/generateToken');
-
-const { sendOtp, verifyOtpCode } = require('../utils/sms');
+const bcrypt = require('bcryptjs'); // Still using bcrypt for local password handling if needed, but Supabase Auth handles it
 
 // @desc    Register a new user (Client or Lawyer)
 // @route   POST /api/auth/register
@@ -16,39 +13,54 @@ const registerUser = async (req, res) => {
       return res.status(400).json({ message: 'Please add all fields' });
     }
 
-    if (role === 'lawyer' && !enrollmentNumber) {
-      return res.status(400).json({ message: 'Enrollment number required for lawyers' });
-    }
-
-    const existingUser = await db.select().from(profiles).where(eq(profiles.email, email)).limit(1);
-    if (existingUser.length > 0) {
-      return res.status(400).json({ message: 'User already exists with this email' });
-    }
-
-    const salt = await bcrypt.genSalt(10);
-    const passwordHash = await bcrypt.hash(password, salt);
-
-    const [newProfile] = await db.insert(profiles).values({
+    // Use Supabase Admin API to create user
+    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
       email,
-      passwordHash,
-      fullName: name,
-      phone,
-      role,
-      isPhoneVerified: false
-    }).returning();
+      password,
+      email_confirm: true,
+      user_metadata: { name, phone, role }
+    });
+
+    if (authError) {
+      return res.status(400).json({ message: authError.message });
+    }
+
+    const { error: profileError } = await supabase
+      .from('profiles')
+      .insert({
+        id: authData.user.id,
+        full_name: name,
+        phone,
+        role,
+        is_phone_verified: false
+      });
+
+    if (profileError) {
+      await supabase.auth.admin.deleteUser(authData.user.id);
+      return res.status(400).json({ message: profileError.message });
+    }
 
     if (role === 'lawyer') {
-      await db.insert(lawyerProfiles).values({
-        userId: newProfile.id,
-        enrollmentNumber,
-        status: 'PENDING_VERIFICATION'
-      });
+      const { error: lawyerError } = await supabase
+        .from('lawyer_profiles')
+        .insert({
+          user_id: authData.user.id,
+          enrollment_number: enrollmentNumber,
+          status: 'PENDING_VERIFICATION'
+        });
+
+      if (lawyerError) {
+        await supabase.auth.admin.deleteUser(authData.user.id);
+        return res.status(400).json({ message: lawyerError.message });
+      }
     }
 
+    // SMS logic remains separate but triggered
+    const { sendOtp } = require('../utils/sms');
     await sendOtp(phone);
 
     res.status(201).json({
-      _id: newProfile.id,
+      _id: authData.user.id,
       name,
       email,
       role,
@@ -66,27 +78,39 @@ const registerUser = async (req, res) => {
 // @access  Public
 const verifyOtp = async (req, res) => {
   const { userId, otp } = req.body;
+  const { verifyOtpCode } = require('../utils/sms');
 
   try {
-    const [profile] = await db.select().from(profiles).where(eq(profiles.id, userId)).limit(1);
-    if (!profile) {
+    const { data: profile, error: fetchError } = await supabase
+      .from('profiles')
+      .select('phone, full_name, role')
+      .eq('id', userId)
+      .maybeSingle();
+
+    if (fetchError || !profile) {
       return res.status(404).json({ message: 'User not found' });
     }
 
     const isVerified = await verifyOtpCode(profile.phone, otp);
 
     if (isVerified) {
-      const [updatedProfile] = await db.update(profiles)
-        .set({ isPhoneVerified: true, updatedAt: new Date() })
-        .where(eq(profiles.id, userId))
-        .returning();
+      const { data: updatedProfile, error: updateError } = await supabase
+        .from('profiles')
+        .update({ is_phone_verified: true })
+        .eq('id', userId)
+        .select()
+        .single();
+
+      if (updateError) return res.status(500).json({ message: updateError.message });
+
+      const { data: { user } } = await supabase.auth.admin.getUserById(userId);
 
       res.json({
-        _id: updatedProfile.id,
-        name: updatedProfile.fullName,
-        email: updatedProfile.email,
+        _id: user.id,
+        name: updatedProfile.full_name,
+        email: user.email,
         role: updatedProfile.role,
-        token: generateToken(updatedProfile.id, updatedProfile.role),
+        token: generateToken(user.id, updatedProfile.role),
         message: 'Phone verified successfully'
       });
     } else {
@@ -105,24 +129,32 @@ const loginUser = async (req, res) => {
   const { email, password } = req.body;
 
   try {
-    const [profile] = await db.select().from(profiles).where(eq(profiles.email, email)).limit(1);
+    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+      email,
+      password
+    });
 
-    if (!profile) {
+    if (authError) {
       return res.status(400).json({ message: 'Invalid credentials' });
     }
 
-    const isMatch = await bcrypt.compare(password, profile.passwordHash);
-    if (!isMatch) {
-      return res.status(400).json({ message: 'Invalid credentials' });
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', authData.user.id)
+      .maybeSingle();
+
+    if (profileError || !profile) {
+      return res.status(400).json({ message: 'Profile not found' });
     }
 
     res.json({
-      _id: profile.id,
-      name: profile.fullName,
-      email: profile.email,
+      _id: authData.user.id,
+      name: profile.full_name,
+      email: authData.user.email,
       role: profile.role,
-      isPhoneVerified: profile.isPhoneVerified,
-      token: generateToken(profile.id, profile.role),
+      isPhoneVerified: profile.is_phone_verified,
+      token: generateToken(authData.user.id, profile.role),
     });
   } catch (error) {
     console.error(error);

@@ -19,18 +19,22 @@ A full-stack application for connecting clients with verified lawyers. Built wit
 
 ## Technology Stack
 - **Frontend**: React 19, Vite 7, TypeScript, TailwindCSS
-- **Backend**: Express.js, Node.js 20, Drizzle ORM
-- **Database**: PostgreSQL (Neon)
-- **Auth**: JWT tokens with bcrypt password hashing
+- **Backend**: Express.js, Node.js 20
+- **Database**: Supabase (PostgreSQL)
+- **Auth**: Supabase Auth with JWT tokens
 - **File Upload**: Cloudinary (optional)
 - **SMS**: Twilio (optional)
 
 ## Development Setup
 
 ### Environment Variables
-The following are configured automatically via Replit:
-- `DATABASE_URL` - PostgreSQL connection string (auto-provisioned)
-- `JWT_SECRET` - Secret for JWT token generation (defaults to dev key)
+The following are configured automatically via Replit or as Secrets:
+- `SUPABASE_URL` - Supabase project URL
+- `SUPABASE_SERVICE_ROLE_KEY` - Supabase Service Role Key
+- `JWT_SECRET` - Secret for JWT token generation
+- `TWILIO_ACCOUNT_SID` - Twilio Account SID
+- `TWILIO_AUTH_TOKEN` - Twilio Auth Token
+- `TWILIO_PHONE_NUMBER` - Twilio Phone Number
 
 ### Running the Application
 Two workflows are configured:
@@ -38,15 +42,11 @@ Two workflows are configured:
 2. **Backend** - `npm start` on port 3000
 
 ### Database Schema
-The PostgreSQL database includes the following tables:
-- `profiles` - User profiles with role (client/lawyer/admin), email, password hash
-- `lawyer_profiles` - Extended lawyer information (enrollment, certificate, status)
+The Supabase database includes the following tables:
+- `profiles` - User profiles with role (client/lawyer/admin)
+- `lawyer_profiles` - Extended lawyer information
 - `categories` - Practice categories
 
-To push schema changes:
-```bash
-cd backend && npm run db:push
-```
 
 ## API Endpoints
 
