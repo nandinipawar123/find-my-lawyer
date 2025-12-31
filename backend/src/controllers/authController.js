@@ -30,6 +30,7 @@ const registerUser = async (req, res) => {
       .insert({
         id: authData.user.id,
         full_name: name,
+        email: email,
         phone,
         role,
         is_phone_verified: false
