@@ -1,6 +1,6 @@
 const supabase = require('../config/supabase');
 const generateToken = require('../utils/generateToken');
-const bcrypt = require('bcryptjs'); // Still using bcrypt for local password handling if needed, but Supabase Auth handles it
+const bcrypt = require('bcryptjs'); 
 
 // @desc    Register a new user (Client or Lawyer)
 // @route   POST /api/auth/register
