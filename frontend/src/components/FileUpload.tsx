@@ -1,6 +1,6 @@
 import React, { useCallback, useState } from 'react';
-import { useDropzone } from 'react-dropzone';
-import { Upload, File, X } from 'lucide-react';
+import { useDropzone, FileRejection } from 'react-dropzone';
+import { Upload, File as FileIcon, X } from 'lucide-react';
 
 interface FileUploadProps {
   onUploadSuccess: (url: string) => void;
@@ -23,7 +23,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess, onUploadError 
       'application/pdf': ['.pdf']
     },
     maxFiles: 1,
-    maxSize: 5242880 // 5MB in bytes
+    maxSize: 5242880 // 5MB
   });
 
   const handleUpload = async () => {
@@ -58,7 +58,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess, onUploadError 
     }
   };
 
-  const fileRejectionItems = fileRejections.map(({ file, errors }) => (
+  const fileRejectionItems = fileRejections.map(({ file, errors }: FileRejection) => (
     <div key={file.name} className="mt-2 text-xs text-red-500">
       {errors.map(e => (
         <p key={e.code}>{e.code === 'file-invalid-type' ? 'Only PDF files are allowed.' : e.message}</p>
@@ -66,14 +66,17 @@ const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess, onUploadError 
     </div>
   ));
 
+  const rootProps = getRootProps();
+  const inputProps = getInputProps();
+
   return (
     <div className="w-full max-w-md mx-auto">
       <div
-        {...getRootProps()}
+        {...rootProps}
         className={`border-2 border-dashed rounded-xl p-10 text-center cursor-pointer transition-all duration-200
           ${isDragActive ? 'border-copper bg-copper/5 scale-[1.02]' : 'border-gray-300 hover:border-copper hover:bg-gray-50'}`}
       >
-        <input {...getInputProps()} />
+        <input {...inputProps} />
         <div className="bg-copper/10 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
           <Upload className="h-8 w-8 text-copper" />
         </div>
@@ -92,7 +95,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess, onUploadError 
       {file && (
         <div className="mt-4 p-4 bg-gray-50 rounded-lg flex items-center justify-between">
           <div className="flex items-center">
-            <File className="h-5 w-5 text-copper mr-2" />
+            <FileIcon className="h-5 w-5 text-copper mr-2" />
             <span className="text-sm font-medium text-gray-700 truncate max-w-[200px]">
               {file.name}
             </span>
