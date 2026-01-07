@@ -1,6 +1,7 @@
 const User = require('../models/User');
 const LawyerProfile = require('../models/LawyerProfile');
 const generateToken = require('../utils/generateToken');
+const twilioService = require('../utils/twilio');
 const bcrypt = require('bcryptjs');
 
 // @desc    Register a new user (Client or Lawyer)
@@ -51,10 +52,13 @@ const registerUser = async (req, res) => {
         });
       }
 
-      // Mock OTP Send
-      console.log(`[MOCK OTP] Sending OTP to ${phone} for User ID ${user._id}`);
-      // In real app: await twilioService.sendOtp(phone);
-
+      // Send OTP via Twilio util (stores OTP in-memory)
+      try {
+        await twilioService.sendOTP(phone);
+      } catch (twErr) {
+        console.error('Twilio send error', twErr);
+        // Continue: user created but OTP send failed
+      }
       res.status(201).json({
         _id: user._id,
         name: user.name,
@@ -77,28 +81,29 @@ const registerUser = async (req, res) => {
 // @route   POST /api/auth/verify-otp
 // @access  Public
 const verifyOtp = async (req, res) => {
-  const { userId, otp } = req.body; // In real app, check OTP against phone or userId
+  const { userId, otp } = req.body;
 
-  // MOCK OTP CHECK
-  if (otp === '123456') {
+  try {
     const user = await User.findById(userId);
-    if (user) {
-      user.isPhoneVerified = true;
-      await user.save();
+    if (!user) return res.status(404).json({ message: 'User not found' });
 
-      res.json({
-        _id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        token: generateToken(user._id, user.role),
-        message: 'Phone verified successfully'
-      });
-    } else {
-      res.status(404).json({ message: 'User not found' });
-    }
-  } else {
-    res.status(400).json({ message: 'Invalid OTP' });
+    const verified = await twilioService.verifyOTP(user.phone, otp);
+    if (!verified) return res.status(400).json({ message: 'Invalid OTP' });
+
+    user.isPhoneVerified = true;
+    await user.save();
+
+    res.json({
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      token: generateToken(user._id, user.role),
+      message: 'Phone verified successfully'
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
