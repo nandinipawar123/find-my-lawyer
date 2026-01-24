@@ -4,11 +4,17 @@ import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 
 const Register = () => {
-    const { type } = useParams(); // 'client' or 'lawyer'
+    const { type } = useParams(); // client | lawyer
     const navigate = useNavigate();
     const { login } = useAuth();
 
-    const [step, setStep] = useState(1); // 1: Register, 2: OTP
+    const isLawyer = type === 'lawyer';
+
+    const [step, setStep] = useState(1); // 1: send otp, 2: verify otp, 3: register
+    const [otpVerified, setOtpVerified] = useState(false);
+    const [otp, setOtp] = useState('');
+    const [error, setError] = useState('');
+
     const [formData, setFormData] = useState({
         name: '',
         email: '',
@@ -16,38 +22,64 @@ const Register = () => {
         phone: '',
         enrollmentNumber: '',
     });
-    const [otp, setOtp] = useState('');
-    const [userId, setUserId] = useState('');
-    const [error, setError] = useState('');
-
-    const isLawyer = type === 'lawyer';
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
     };
 
-    const handleRegister = async (e: React.FormEvent) => {
+    // STEP 1: SEND OTP
+    const handleSendOtp = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
-            const payload = {
-                ...formData,
-                role: type,
-            };
-
-            const res = await api.post('/auth/register', payload);
-            setUserId(res.data._id);
+            await api.post('/auth/send-otp', { phone: formData.phone });
             setStep(2);
             setError('');
         } catch (err: any) {
-            setError(err.response?.data?.message || 'Registration failed');
+            setError(err.response?.data?.message || 'Failed to send OTP');
         }
     };
 
+    // STEP 2: VERIFY OTP
     const handleVerifyOtp = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
-            const res = await api.post('/auth/verify-otp', { userId, otp });
-            // Login the user
+            await api.post('/auth/verify-otp', {
+                phone: formData.phone,
+                otp,
+            });
+            setOtpVerified(true);
+            setStep(3);
+            setError('');
+        } catch (err: any) {
+            setError(err.response?.data?.message || 'Invalid OTP');
+        }
+    };
+
+    // STEP 3: REGISTER USER
+    const handleRegister = async (e: React.FormEvent) => {
+        e.preventDefault();
+        try {
+            const endpoint = isLawyer
+                ? '/auth/register-lawyer'
+                : '/auth/register-client';
+
+            const payload = isLawyer
+                ? {
+                    name: formData.name,
+                    email: formData.email,
+                    password: formData.password,
+                    phone: formData.phone,
+                    enrollmentNumber: formData.enrollmentNumber,
+                }
+                : {
+                    name: formData.name,
+                    email: formData.email,
+                    password: formData.password,
+                    phone: formData.phone,
+                };
+
+            const res = await api.post(endpoint, payload);
+
             login(res.data.token, res.data);
 
             if (isLawyer) {
@@ -56,7 +88,7 @@ const Register = () => {
                 navigate('/dashboard');
             }
         } catch (err: any) {
-            setError(err.response?.data?.message || 'Invalid OTP');
+            setError(err.response?.data?.message || 'Registration failed');
         }
     };
 
@@ -67,60 +99,57 @@ const Register = () => {
                     {isLawyer ? 'Lawyer Registration' : 'Client Registration'}
                 </h2>
 
-                {error && <div className="bg-red-100 text-red-700 p-3 rounded mb-4">{error}</div>}
+                {error && (
+                    <div className="bg-red-100 text-red-700 p-3 rounded mb-4">
+                        {error}
+                    </div>
+                )}
 
-                {step === 1 ? (
-                    <form onSubmit={handleRegister} className="space-y-4">
-                        <input
-                            type="text" placeholder="Full Name" name="name"
-                            className="w-full p-2 border rounded"
-                            onChange={handleChange} required
-                        />
-                        <input
-                            type="email" placeholder="Email Address" name="email"
-                            className="w-full p-2 border rounded"
-                            onChange={handleChange} required
-                        />
-                        <input
-                            type="text" placeholder="Phone Number" name="phone"
-                            className="w-full p-2 border rounded"
-                            onChange={handleChange} required
-                        />
-                        <input
-                            type="password" placeholder="Password" name="password"
-                            className="w-full p-2 border rounded"
-                            onChange={handleChange} required
-                        />
+                {/* STEP 1 */}
+                {step === 1 && (
+                    <form onSubmit={handleSendOtp} className="space-y-4">
+                        <input name="name" placeholder="Full Name" required className="w-full p-2 border rounded" onChange={handleChange} />
+                        <input name="email" type="email" placeholder="Email" required className="w-full p-2 border rounded" onChange={handleChange} />
+                        <input name="phone" placeholder="Phone Number" required className="w-full p-2 border rounded" onChange={handleChange} />
+                        <input name="password" type="password" placeholder="Password" required className="w-full p-2 border rounded" onChange={handleChange} />
 
                         {isLawyer && (
                             <input
-                                type="text" placeholder="Bar Council Enrollment Number" name="enrollmentNumber"
+                                name="enrollmentNumber"
+                                placeholder="Bar Council Enrollment Number"
+                                required
                                 className="w-full p-2 border rounded"
-                                onChange={handleChange} required
+                                onChange={handleChange}
                             />
                         )}
 
-                        <button
-                            type="submit"
-                            className="w-full py-3 bg-navy text-white font-bold rounded hover:bg-opacity-90"
-                        >
+                        <button className="w-full py-3 bg-navy text-white rounded">
                             Send OTP
                         </button>
                     </form>
-                ) : (
+                )}
+
+                {/* STEP 2 */}
+                {step === 2 && (
                     <form onSubmit={handleVerifyOtp} className="space-y-4">
-                        <p className="text-center text-gray-600 mb-4">Enter the OTP sent to your phone (Mock: 123456)</p>
                         <input
-                            type="text" placeholder="Enter OTP"
-                            className="w-full p-2 border rounded text-center text-xl tracking-widest"
+                            placeholder="Enter OTP"
                             value={otp}
-                            onChange={(e) => setOtp(e.target.value)} required
+                            onChange={(e) => setOtp(e.target.value)}
+                            className="w-full p-2 border rounded text-center"
+                            required
                         />
-                        <button
-                            type="submit"
-                            className="w-full py-3 bg-green-600 text-white font-bold rounded hover:bg-opacity-90"
-                        >
-                            Verify & Proceed
+                        <button className="w-full py-3 bg-green-600 text-white rounded">
+                            Verify OTP
+                        </button>
+                    </form>
+                )}
+
+                {/* STEP 3 */}
+                {step === 3 && otpVerified && (
+                    <form onSubmit={handleRegister}>
+                        <button className="w-full py-3 bg-blue-600 text-white rounded">
+                            Complete Registration
                         </button>
                     </form>
                 )}

@@ -1,106 +1,130 @@
 const LawyerProfile = require('../models/LawyerProfile');
-const User = require('../models/User');
+const supabase = require('../config/supabase');
 
-// @desc    Upload Lawyer Certificate
-// @route   POST /api/lawyers/upload-certificate
-// @access  Private (Lawyer)
-const uploadCertificate = async (req, res) => {
-    // Mock File Upload (Multer middleware usually handles this)
-    // Assuming req.file.path or similar would exist if cloudinary/multer was set up
-    // For MVP, we'll accept a 'fake' URL in body or assume a file path from a mock middleware
-
-    try {
-        const userId = req.user._id;
-        // In a real scenario, use Cloudinary url
-        const certificateUrl = req.body.certificateUrl || 'https://via.placeholder.com/certificate.pdf';
-
-        const profile = await LawyerProfile.findOne({ user: userId });
-
-        if (!profile) {
-            return res.status(404).json({ message: 'Lawyer profile not found' });
-        }
-
-        profile.certificateUrl = certificateUrl;
-        await profile.save();
-
-        res.json({ message: 'Certificate uploaded successfully', certificateUrl });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Server Error' });
+/* ========================================
+   UPLOAD CERTIFICATE (LAWYER)
+======================================== */
+exports.uploadCertificate = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: 'No file uploaded' });
     }
+
+    const userId = req.user._id.toString();
+    const ext = req.file.originalname.split('.').pop();
+    const filePath = `lawyers/${userId}/certificate.${ext}`;
+
+    const { error } = await supabase.storage
+      .from('lawyer-certificates')
+      .upload(filePath, req.file.buffer, {
+        contentType: req.file.mimetype,
+        upsert: true,
+      });
+
+    if (error) throw error;
+
+    const profile = await LawyerProfile.findOne({ user: userId });
+
+    if (!profile) {
+      return res.status(404).json({ message: 'Lawyer profile not found' });
+    }
+
+    profile.certificateUrl = filePath;
+    profile.status = 'pending';
+    profile.adminComment = null;
+    profile.verifiedAt = null;
+
+    await profile.save();
+
+    res.json({
+      message: 'Certificate uploaded. Verification pending.',
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Upload failed' });
+  }
 };
 
-// @desc    Get Pending Lawyers (Admin)
-// @route   GET /api/lawyers/pending
-// @access  Private (Admin)
-const getPendingLawyers = async (req, res) => {
-    try {
-        const profiles = await LawyerProfile.find({ status: 'PENDING_VERIFICATION' }).populate('user', 'name email phone');
-        res.json(profiles);
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Server Error' });
-    }
+/* ========================================
+   ADMIN – GET PENDING LAWYERS
+======================================== */
+exports.getPendingLawyers = async (req, res) => {
+  try {
+    const lawyers = await LawyerProfile.find({ status: 'pending' })
+      .populate('user', 'name email phone');
+
+    res.json(lawyers);
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
 };
 
-// @desc    Approve/Reject Lawyer
-// @route   PUT /api/lawyers/verify/:id
-// @access  Private (Admin)
-const verifyLawyer = async (req, res) => {
-    const { status, authorizedRate } = req.body; // status: 'VERIFIED' or 'REJECTED'
-    const profileId = req.params.id;
+/* ========================================
+   ADMIN – VERIFY / REJECT LAWYER
+======================================== */
+exports.verifyLawyer = async (req, res) => {
+  const { status, adminComment, authorizedRate } = req.body;
+  const { id } = req.params;
 
-    try {
-        const profile = await LawyerProfile.findById(profileId);
+  if (!['verified', 'rejected'].includes(status)) {
+    return res.status(400).json({ message: 'Invalid status' });
+  }
 
-        if (!profile) {
-            return res.status(404).json({ message: 'Profile not found' });
-        }
+  try {
+    const profile = await LawyerProfile.findById(id);
 
-        if (status) profile.status = status;
-        if (authorizedRate) profile.authorizedRate = authorizedRate;
-
-        await profile.save();
-
-        res.json({ message: `Lawyer ${status.toLowerCase()} successfully`, profile });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Server Error' });
+    if (!profile) {
+      return res.status(404).json({ message: 'Lawyer not found' });
     }
+
+    profile.status = status;
+    profile.adminComment = adminComment || null;
+    profile.verifiedAt = status === 'verified' ? new Date() : null;
+
+    if (authorizedRate) {
+      profile.authorizedRate = authorizedRate;
+    }
+
+    await profile.save();
+
+    res.json({
+      message: `Lawyer ${status} successfully`,
+      profile,
+    });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
 };
 
-// @desc    Update Lawyer Profile (Bio/Expertise)
-// @route   PUT /api/lawyers/profile
-// @access  Private (Lawyer)
-const updateProfile = async (req, res) => {
-    const { bio, expertise } = req.body;
+/* ========================================
+   LAWYER – UPDATE PROFILE
+======================================== */
+exports.updateProfile = async (req, res) => {
+  const { bio, expertise } = req.body;
 
-    try {
-        const profile = await LawyerProfile.findOne({ user: req.user._id });
+  try {
+    const profile = await LawyerProfile.findOne({ user: req.user._id });
 
-        if (!profile) {
-            return res.status(404).json({ message: 'Profile not found' });
-        }
-
-        // Only allow if verified
-        if (profile.status !== 'VERIFIED') {
-            return res.status(403).json({ message: 'Account not verified yet' });
-        }
-
-        if (bio) profile.bio = bio;
-        if (expertise) profile.expertise = expertise; // Array of strings
-
-        await profile.save();
-        res.json(profile);
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Server Error' });
+    if (!profile) {
+      return res.status(404).json({ message: 'Profile not found' });
     }
-};
 
-module.exports = {
-    uploadCertificate,
-    getPendingLawyers,
-    verifyLawyer,
-    updateProfile
+    if (profile.status !== 'verified') {
+      return res.status(403).json({
+        message: 'Your account is not verified yet',
+      });
+    }
+
+    if (bio) profile.bio = bio;
+    if (expertise) profile.expertise = expertise;
+
+    await profile.save();
+
+    res.json({
+      message: 'Profile updated successfully',
+      profile,
+    });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
 };

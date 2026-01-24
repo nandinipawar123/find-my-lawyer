@@ -1,12 +1,39 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const adminController = require('../controllers/adminController');
-const auth = require('../middlewares/auth');
-const rbac = require('../middlewares/rbac');
 
-// Get all pending lawyers
-router.get('/pending-lawyers', auth, rbac(['ADMIN']), adminController.getPendingLawyers);
-// Approve or reject lawyer
-router.post('/review-lawyer', auth, rbac(['ADMIN']), adminController.reviewLawyer);
+const {
+  getPendingLawyers,
+  reviewLawyer,
+  getVerifiedLawyers,
+} = require("../controllers/adminController");
+
+const { protect, authorize } = require("../middleware/authMiddleware");
+
+// ===============================
+// ADMIN ROUTES
+// ===============================
+
+// Get all pending lawyers (ADMIN ONLY)
+router.get(
+  "/pending-lawyers",
+  protect,
+  authorize("admin"),
+  getPendingLawyers
+);
+
+// Approve / Reject lawyer (ADMIN ONLY)
+router.put(
+  "/review-lawyer",
+  protect,
+  authorize("admin"),
+  reviewLawyer
+);
+
+// ===============================
+// PUBLIC ROUTE
+// ===============================
+
+// Get verified lawyers (for users)
+router.get("/verified-lawyers", getVerifiedLawyers);
 
 module.exports = router;

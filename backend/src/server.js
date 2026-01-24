@@ -1,31 +1,46 @@
-require('dotenv').config();
-const express = require('express');
-const cors = require('cors');
-const connectDB = require('./config/db');
+const express = require("express");
+const dotenv = require("dotenv");
+const cors = require("cors");
+const connectDB = require("./config/db");
 
-// Connect to Database
-connectDB();
+dotenv.config();
 
 const app = express();
 
-// Middleware
+// ======================
+// MIDDLEWARE
+// ======================
 app.use(express.json());
 app.use(cors());
 
-// Basic Route
-app.get('/', (req, res) => {
-    res.send('FindMyLawyer API is running...');
+// ======================
+// DATABASE
+// ======================
+connectDB();
+
+// ======================
+// ROUTES (IMPORT FIRST)
+// ======================
+const authRoutes = require("./routes/authRoutes");
+const adminRoutes = require("./routes/admin");
+
+// ======================
+// ROUTES (USE AFTER IMPORT)
+// ======================
+app.use("/api/auth", authRoutes);
+app.use("/api/admin", adminRoutes);
+
+// ======================
+// TEST ROUTE
+// ======================
+app.get("/", (req, res) => {
+  res.send("API is running...");
 });
 
-// Import Routes
-const authRoutes = require('./routes/authRoutes');
-const lawyerRoutes = require('./routes/lawyerRoutes');
-
-app.use('/api/auth', authRoutes);
-app.use('/api/lawyers', lawyerRoutes);
-
+// ======================
+// SERVER
+// ======================
 const PORT = process.env.PORT || 5000;
-
 app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+  console.log(`Server running on port ${PORT}`);
 });
