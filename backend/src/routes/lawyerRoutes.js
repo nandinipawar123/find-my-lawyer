@@ -1,29 +1,24 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
+const multer = require("multer");
 
 const {
   uploadCertificate,
-  getPendingLawyers,
-  verifyLawyer,
   updateProfile,
-} = require('../controllers/lawyerController');
+} = require("../controllers/lawyerController");
 
-const { protect, authorize } = require('../middleware/authMiddleware');
-const upload = require('../middleware/uploadMiddleware');
+const { protect } = require("../middleware/authMiddleware");
+
+const upload = multer({ storage: multer.memoryStorage() });
 
 // Lawyer Routes
 router.post(
-  '/upload-certificate',
+  "/upload-certificate",
   protect,
-  authorize('lawyer'),
-  upload.single('certificate'),
+  upload.single("certificate"),
   uploadCertificate
 );
 
-router.put('/profile', protect, authorize('lawyer'), updateProfile);
-
-// Admin Routes
-router.get('/pending', protect, authorize('admin'), getPendingLawyers);
-router.put('/verify/:id', protect, authorize('admin'), verifyLawyer);
+router.put("/update-profile", protect, updateProfile);
 
 module.exports = router;

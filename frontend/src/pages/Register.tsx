@@ -59,9 +59,7 @@ const Register = () => {
     const handleRegister = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
-            const endpoint = isLawyer
-                ? '/auth/register-lawyer'
-                : '/auth/register-client';
+            const endpoint = '/auth/register';
 
             const payload = isLawyer
                 ? {
@@ -80,7 +78,7 @@ const Register = () => {
 
             const res = await api.post(endpoint, payload);
 
-            login(res.data.token, res.data);
+            login(res.data.token, res.data.user);
 
             if (isLawyer) {
                 navigate('/lawyer/upload');

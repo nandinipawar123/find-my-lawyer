@@ -14,9 +14,9 @@ const Login = () => {
         e.preventDefault();
         try {
             const res = await api.post('/auth/login', { email, password });
-            login(res.data.token, res.data); // res.data contains user info and token
+            login(res.data.token, res.data.user); // res.data contains user info and token
 
-            const role = res.data.role;
+            const role = res.data.user.role;
             if (role === 'admin') navigate('/admin');
             else if (role === 'lawyer') navigate('/lawyer/dashboard');
             else navigate('/dashboard');

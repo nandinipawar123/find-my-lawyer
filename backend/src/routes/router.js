@@ -1,9 +1,13 @@
-const router = require('express').Router();
+const express = require("express");
+const router = express.Router();
 
+const authRoutes = require("./authRoutes");
+const adminRoutes = require("./adminRoutes");
+const lawyerRoutes = require("./lawyerRoutes");
 
-// Users routes
-
-router.use(require('@routes/user'));
-
+// Mount routes
+router.use("/auth", authRoutes);
+router.use("/admin", adminRoutes);
+router.use("/lawyer", lawyerRoutes);
 
 module.exports = router;

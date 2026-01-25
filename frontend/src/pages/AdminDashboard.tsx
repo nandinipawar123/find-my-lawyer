@@ -8,7 +8,6 @@ const AdminDashboard = () => {
   const navigate = useNavigate();
 
   const [pendingLawyers, setPendingLawyers] = useState<any[]>([]);
-  const [rate, setRate] = useState<number>(0);
   const [loading, setLoading] = useState(true);
 
   // Fetch pending lawyers
@@ -28,7 +27,7 @@ const AdminDashboard = () => {
     fetchPending();
   }, []);
 
-  // Approve / Reject
+  // Approve / Reject lawyer
   const handleVerify = async (
     id: string,
     status: "VERIFIED" | "REJECTED"
@@ -37,10 +36,9 @@ const AdminDashboard = () => {
       await api.put("/admin/review-lawyer", {
         lawyerId: id,
         status,
-        authorizedRate: status === "VERIFIED" ? rate : 0,
       });
 
-      alert(`Lawyer ${status}`);
+      alert(`Lawyer ${status.toLowerCase()} successfully`);
       fetchPending();
     } catch (error) {
       console.error(error);
@@ -80,40 +78,34 @@ const AdminDashboard = () => {
                 <th className="p-3">Email</th>
                 <th className="p-3">Enrollment</th>
                 <th className="p-3">Certificate</th>
-                <th className="p-3">Rate</th>
                 <th className="p-3">Action</th>
               </tr>
             </thead>
             <tbody>
               {pendingLawyers.map((lawyer) => (
-                <tr key={lawyer._id} className="border-t">
-                  <td className="p-3">{lawyer.user?.name}</td>
-                  <td className="p-3">{lawyer.user?.email}</td>
-                  <td className="p-3">{lawyer.enrollmentNumber}</td>
+                <tr key={lawyer.id} className="border-t">
+                  <td className="p-3">{lawyer.users?.name}</td>
+                  <td className="p-3">{lawyer.users?.email}</td>
+                  <td className="p-3">{lawyer.enrollment_number}</td>
                   <td className="p-3">
-                    <a
-                      href={lawyer.certificateUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-blue-600 underline"
-                    >
-                      View
-                    </a>
-                  </td>
-                  <td className="p-3">
-                    <input
-                      type="number"
-                      className="border p-1 w-24"
-                      onChange={(e) =>
-                        setRate(Number(e.target.value))
-                      }
-                    />
+                    {lawyer.certificate_url ? (
+                      <a
+                        href={lawyer.certificate_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-blue-600 underline"
+                      >
+                        View
+                      </a>
+                    ) : (
+                      "Not uploaded"
+                    )}
                   </td>
                   <td className="p-3 flex gap-2">
                     <button
                       className="bg-green-600 text-white px-3 py-1 rounded"
                       onClick={() =>
-                        handleVerify(lawyer._id, "VERIFIED")
+                        handleVerify(lawyer.id, "VERIFIED")
                       }
                     >
                       Approve
@@ -121,7 +113,7 @@ const AdminDashboard = () => {
                     <button
                       className="bg-red-600 text-white px-3 py-1 rounded"
                       onClick={() =>
-                        handleVerify(lawyer._id, "REJECTED")
+                        handleVerify(lawyer.id, "REJECTED")
                       }
                     >
                       Reject

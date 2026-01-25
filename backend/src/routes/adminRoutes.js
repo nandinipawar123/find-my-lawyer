@@ -7,33 +7,13 @@ const {
   getVerifiedLawyers,
 } = require("../controllers/adminController");
 
-const { protect, authorize } = require("../middleware/authMiddleware");
+const { protect, isAdmin } = require("../middleware/authMiddleware");
 
-// ===============================
-// ADMIN ROUTES
-// ===============================
+// ADMIN ONLY
+router.get("/pending-lawyers", protect, isAdmin, getPendingLawyers);
+router.put("/review-lawyer", protect, isAdmin, reviewLawyer);
 
-// Get all pending lawyers (ADMIN ONLY)
-router.get(
-  "/pending-lawyers",
-  protect,
-  authorize("admin"),
-  getPendingLawyers
-);
-
-// Approve / Reject lawyer (ADMIN ONLY)
-router.put(
-  "/review-lawyer",
-  protect,
-  authorize("admin"),
-  reviewLawyer
-);
-
-// ===============================
-// PUBLIC ROUTE
-// ===============================
-
-// Get verified lawyers (for users)
+// PUBLIC
 router.get("/verified-lawyers", getVerifiedLawyers);
 
 module.exports = router;

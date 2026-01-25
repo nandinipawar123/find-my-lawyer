@@ -1,45 +1,43 @@
-const jwt = require('jsonwebtoken');
-const User = require('../models/User');
+const jwt = require("jsonwebtoken");
 
-const protect = async (req, res, next) => {
-    let token;
+/**
+ * Protect routes – verifies JWT
+ */
+exports.protect = (req, res, next) => {
+  try {
+    const authHeader = req.headers.authorization;
 
-    if (
-        req.headers.authorization &&
-        req.headers.authorization.startsWith('Bearer')
-    ) {
-        try {
-            token = req.headers.authorization.split(' ')[1];
-
-            const decoded = jwt.verify(token, process.env.JWT_SECRET || 'supersecretkey_dev_only');
-
-            req.user = await User.findById(decoded.id).select('-password');
-
-            if (!req.user) {
-                return res.status(401).json({ message: 'Not authorized, user not found' });
-            }
-
-            next();
-        } catch (error) {
-            console.error(error);
-            res.status(401).json({ message: 'Not authorized, token failed' });
-        }
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return res.status(401).json({ message: "Not authorized, no token" });
     }
 
-    if (!token) {
-        res.status(401).json({ message: 'Not authorized, no token' });
-    }
+    const token = authHeader.split(" ")[1];
+
+    const decoded = jwt.verify(
+      token,
+      process.env.JWT_SECRET || "supersecretkey_dev_only"
+    );
+
+    req.user = decoded; // { id, role }
+    next();
+  } catch (error) {
+    return res.status(401).json({ message: "Invalid or expired token" });
+  }
 };
 
-const authorize = (...roles) => {
-    return (req, res, next) => {
-        if (!req.user || !roles.includes(req.user.role)) {
-            return res.status(403).json({
-                message: `User role ${req.user ? req.user.role : 'unknown'} is not authorized to access this route`
-            });
-        }
-        next();
-    };
+/**
+ * Role based access control
+ */
+exports.isAdmin = (req, res, next) => {
+  if (req.user.role !== "admin") {
+    return res.status(403).json({ message: "Admin access only" });
+  }
+  next();
 };
 
-module.exports = { protect, authorize };
+exports.isLawyer = (req, res, next) => {
+  if (req.user.role !== "lawyer") {
+    return res.status(403).json({ message: "Lawyer access only" });
+  }
+  next();
+};
