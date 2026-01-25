@@ -1,178 +1,174 @@
-const supabase = require('../config/supabase');
-const generateToken = require('../utils/generateToken');
-const bcrypt = require('bcryptjs'); 
+const supabase = require("../config/supabase");
+const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
+const twilioService = require("../utils/twilio");
 
-// @desc    Register a new user (Client or Lawyer)
-// @route   POST /api/auth/register
-// @access  Public
-const registerUser = async (req, res) => {
+// ===============================
+// GENERATE JWT
+// ===============================
+const generateToken = (user) => {
+  return jwt.sign(
+    {
+      id: user.id,
+      role: user.role,
+    },
+    process.env.JWT_SECRET,
+    { expiresIn: "7d" }
+  );
+};
+
+// ===============================
+// SEND OTP
+// ===============================
+exports.sendOtp = async (req, res) => {
   try {
-    const { name, email, password, phone, role, enrollmentNumber } = req.body;
+    const { phone } = req.body;
 
-    if (!name || !email || !password || !phone || !role) {
-      return res.status(400).json({ message: 'Please add all fields' });
+    if (!phone) {
+      return res.status(400).json({ message: "Phone number is required" });
     }
 
-    // Use Supabase Admin API to create user
-    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true,
-      user_metadata: { name, phone, role }
-    });
+    await twilioService.sendOTP(phone);
 
-    if (authError) {
-      return res.status(400).json({ message: authError.message });
+    res.json({ message: "OTP sent successfully" });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Failed to send OTP" });
+  }
+};
+
+// ===============================
+// VERIFY OTP
+// ===============================
+exports.verifyOtp = async (req, res) => {
+  try {
+    const { phone, otp } = req.body;
+
+    const verified = await twilioService.verifyOTP(phone, otp);
+
+    if (!verified) {
+      return res.status(400).json({ message: "Invalid OTP" });
     }
 
-    const { error: profileError } = await supabase
-      .from('profiles')
-      .insert({
-        id: authData.user.id,
-        full_name: name,
-        email: email,
-        phone,
-        role,
-        is_phone_verified: false
-      });
+    res.json({ message: "OTP verified successfully" });
+  } catch (error) {
+    res.status(500).json({ message: "OTP verification failed" });
+  }
+};
 
-    if (profileError) {
-      await supabase.auth.admin.deleteUser(authData.user.id);
-      return res.status(400).json({ message: profileError.message });
+// ===============================
+// REGISTER USER / LAWYER
+// ===============================
+exports.register = async (req, res) => {
+  try {
+    const { name, email, password, phone, enrollmentNumber } = req.body;
+
+    if (!name || !email || !password || !phone) {
+      return res.status(400).json({ message: "All fields are required" });
     }
 
-    if (role === 'lawyer') {
-      const { error: lawyerError } = await supabase
-        .from('lawyer_profiles')
-        .insert({
-          user_id: authData.user.id,
+    // Check if user exists
+    const { data: existingUser } = await supabase
+      .from("users")
+      .select("id")
+      .eq("email", email)
+      .single();
+
+    if (existingUser) {
+      return res.status(400).json({ message: "User already exists" });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Create user
+    const { data: user, error } = await supabase
+      .from("users")
+      .insert([
+        {
+          name,
+          email,
+          phone,
+          password: hashedPassword,
+          role: enrollmentNumber ? "lawyer" : "client",
+        },
+      ])
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    // If lawyer → create profile
+    if (enrollmentNumber) {
+      await supabase.from("lawyer_profiles").insert([
+        {
+          user_id: user.id,
           enrollment_number: enrollmentNumber,
-          status: 'PENDING_VERIFICATION'
-        });
-
-      if (lawyerError) {
-        await supabase.auth.admin.deleteUser(authData.user.id);
-        return res.status(400).json({ message: lawyerError.message });
-      }
+          status: "PENDING",
+        },
+      ]);
     }
 
-    // SMS logic remains separate but triggered
-    const { sendOtp } = require('../utils/sms');
-    await sendOtp(phone);
+    const token = generateToken(user);
 
     res.status(201).json({
-      _id: authData.user.id,
-      name,
-      email,
-      role,
-      isPhoneVerified: false,
-      message: 'User registered. Please verify OTP.',
-    });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server error' });
-  }
-};
-
-// @desc    Verify OTP
-// @route   POST /api/auth/verify-otp
-// @access  Public
-const verifyOtp = async (req, res) => {
-  const { userId, otp } = req.body;
-  const { verifyOtpCode } = require('../utils/sms');
-
-  try {
-    const { data: profile, error: fetchError } = await supabase
-      .from('profiles')
-      .select('phone, full_name, role')
-      .eq('id', userId)
-      .maybeSingle();
-
-    if (fetchError || !profile) {
-      return res.status(404).json({ message: 'User not found' });
-    }
-
-    const isVerified = await verifyOtpCode(profile.phone, otp);
-
-    if (isVerified) {
-      const { data: updatedProfile, error: updateError } = await supabase
-        .from('profiles')
-        .update({ is_phone_verified: true })
-        .eq('id', userId)
-        .select()
-        .single();
-
-      if (updateError) return res.status(500).json({ message: updateError.message });
-
-      const { data: { user } } = await supabase.auth.admin.getUserById(userId);
-
-      res.json({
-        _id: user.id,
-        name: updatedProfile.full_name,
+      token,
+      user: {
+        id: user.id,
+        name: user.name,
         email: user.email,
-        role: updatedProfile.role,
-        token: generateToken(user.id, updatedProfile.role),
-        message: 'Phone verified successfully'
-      });
-    } else {
-      res.status(400).json({ message: 'Invalid OTP' });
-    }
+        role: user.role,
+      },
+    });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ message: "Registration failed" });
   }
 };
 
-// @desc    Authenticate a user
-// @route   POST /api/auth/login
-// @access  Public
-const loginUser = async (req, res) => {
-  const { email, password } = req.body;
-
+// ===============================
+// LOGIN USER (WITH SUPABASE LOG)
+// ===============================
+exports.loginUser = async (req, res) => {
   try {
-    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-      email,
-      password
-    });
+    const { email, password } = req.body;
 
-    if (authError) {
-      return res.status(400).json({ message: 'Invalid credentials' });
+    const { data: user } = await supabase
+      .from("users")
+      .select("*")
+      .eq("email", email)
+      .single();
+
+    if (!user) {
+      return res.status(400).json({ message: "Invalid credentials" });
     }
 
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', authData.user.id)
-      .maybeSingle();
-
-    if (profileError || !profile) {
-      return res.status(400).json({ message: 'Profile not found' });
+    const match = await bcrypt.compare(password, user.password);
+    if (!match) {
+      return res.status(400).json({ message: "Invalid credentials" });
     }
+
+    // ✅ STORE LOGIN INFO IN SUPABASE
+    await supabase
+      .from("users")
+      .update({
+        last_login: new Date(),
+        login_ip: req.ip,
+      })
+      .eq("id", user.id);
+
+    const token = generateToken(user);
 
     res.json({
-      _id: authData.user.id,
-      name: profile.full_name,
-      email: authData.user.email,
-      role: profile.role,
-      isPhoneVerified: profile.is_phone_verified,
-      token: generateToken(authData.user.id, profile.role),
+      token,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+      },
     });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ message: "Login failed" });
   }
-};
-
-// @desc    Get user data
-// @route   GET /api/auth/me
-// @access  Private
-const getMe = async (req, res) => {
-  res.status(200).json(req.user);
-};
-
-module.exports = {
-  registerUser,
-  loginUser,
-  getMe,
-  verifyOtp
 };
